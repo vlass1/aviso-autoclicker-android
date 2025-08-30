@@ -1,107 +1,296 @@
-name: Build APK
+name: Build APK (auto-generate project)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Prepare project
+      # 1) Создаём минимальный Android-проект (перезапишет папку app)
+      - name: Generate Android project
         run: |
-          mkdir -p app/src/main/java/com/example/app
+          mkdir -p app/src/main/java/top/dvptoken/avisoautoclicker
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
 
           cat > settings.gradle <<'EOF'
 pluginManagement {
-    repositories { google(); mavenCentral(); gradlePluginPortal() }
+  repositories { google(); mavenCentral(); gradlePluginPortal() }
 }
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories { google(); mavenCentral() }
+  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+  repositories { google(); mavenCentral() }
 }
-rootProject.name = "AvisoAutoClicker"
+rootProject.name = "AVISO Autoclicker"
 include(":app")
 EOF
 
           cat > build.gradle <<'EOF'
 buildscript { }
 plugins {
-    id("com.android.application") version "8.5.0" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+  id("com.android.application") version "8.5.0" apply false
+  id("org.jetbrains.kotlin.android") version "1.9.24" apply false
 }
 EOF
 
           cat > gradle.properties <<'EOF'
 org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
 android.useAndroidX=true
+android.nonTransitiveRClass=true
 EOF
 
           cat > app/build.gradle <<'EOF'
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+  id("com.android.application")
+  id("org.jetbrains.kotlin.android")
 }
 android {
-    namespace "com.example.app"
-    compileSdk 34
-    defaultConfig {
-        applicationId "com.example.app"
-        minSdk 24
-        targetSdk 34
-        versionCode 1
-        versionName "1.0"
-    }
+  namespace = "top.dvptoken.avisoautoclicker"
+  compileSdk = 34
+  defaultConfig {
+    applicationId = "top.dvptoken.avisoautoclicker"
+    minSdk = 24
+    targetSdk = 34
+    versionCode = 1
+    versionName = "1.0"
+  }
+  buildTypes { release { minifyEnabled = false } }
 }
 dependencies {
-    implementation "androidx.core:core-ktx:1.13.1"
-    implementation "androidx.appcompat:appcompat:1.7.0"
+  implementation("androidx.core:core-ktx:1.13.1")
+  implementation("androidx.appcompat:appcompat:1.7.0")
+  implementation("com.google.android.material:material:1.12.0")
 }
 EOF
 
           cat > app/src/main/AndroidManifest.xml <<'EOF'
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.app">
-    <application android:label="AvisoAutoClicker">
-        <activity android:name=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-        </activity>
-    </application>
+  package="top.dvptoken.avisoautoclicker">
+  <uses-permission android:name="android.permission.INTERNET"/>
+  <application
+    android:label="AVISO Autoclicker"
+    android:usesCleartextTraffic="true"
+    android:theme="@style/Theme.App">
+    <activity
+      android:name=".MainActivity"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN"/>
+        <category android:name="android.intent.category.LAUNCHER"/>
+      </intent-filter>
+    </activity>
+  </application>
 </manifest>
 EOF
 
-          cat > app/src/main/java/com/example/app/MainActivity.kt <<'EOF'
-package com.example.app
-import android.os.Bundle
+          cat > app/src/main/res/values/themes.xml <<'EOF'
+<resources>
+  <style name="Theme.App" parent="Theme.Material3.DayNight.NoActionBar"/>
+</resources>
+EOF
+
+          cat > app/src/main/res/layout/activity_main.xml <<'EOF'
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:orientation="vertical"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent">
+  <LinearLayout
+    android:orientation="horizontal"
+    android:padding="10dp"
+    android:gravity="center_vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <EditText android:id="@+id/etMax"  android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:inputType="number" android:hint="Max" android:text="30"/>
+    <EditText android:id="@+id/etVMin" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:inputType="number" android:hint="YT мин" android:text="12"/>
+    <EditText android:id="@+id/etVMax" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:inputType="number" android:hint="YT макс" android:text="16"/>
+    <EditText android:id="@+id/etGMin" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:inputType="number" android:hint="Пауза мин" android:text="2"/>
+    <EditText android:id="@+id/etGMax" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:inputType="number" android:hint="Пауза макс" android:text="4"/>
+    <Button android:id="@+id/btnStart" android:text="Start" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+    <Button android:id="@+id/btnStop"  android:text="Stop"  android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp"/>
+  </LinearLayout>
+  <WebView android:id="@+id/mainWeb" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
+  <WebView android:id="@+id/ytWeb"   android:visibility="gone" android:layout_width="match_parent" android:layout_height="match_parent"/>
+</LinearLayout>
+EOF
+
+          cat > app/src/main/java/top/dvptoken/avisoautoclicker/MainActivity.kt <<'EOF'
+package top.dvptoken.avisoautoclicker
+import android.annotation.SuppressLint
+import android.os.*
+import android.webkit.*
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import kotlin.math.max
+import kotlin.random.Random
 
 class MainActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+  private lateinit var mainWeb: WebView
+  private lateinit var ytWeb: WebView
+  private lateinit var etMax: EditText
+  private lateinit var etVMin: EditText
+  private lateinit var etVMax: EditText
+  private lateinit var etGMin: EditText
+  private lateinit var etGMax: EditText
+  private var running=false
+  private val ui=Handler(Looper.getMainLooper())
+
+  @SuppressLint("SetJavaScriptEnabled")
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState); setContentView(R.layout.activity_main)
+    etMax=findViewById(R.id.etMax); etVMin=findViewById(R.id.etVMin); etVMax=findViewById(R.id.etVMax)
+    etGMin=findViewById(R.id.etGMin); etGMax=findViewById(R.id.etGMax)
+    val btnStart:Button=findViewById(R.id.btnStart); val btnStop:Button=findViewById(R.id.btnStop)
+    mainWeb=findViewById(R.id.mainWeb); ytWeb=findViewById(R.id.ytWeb)
+
+    mainWeb.settings.javaScriptEnabled=true
+    mainWeb.settings.domStorageEnabled=true
+    mainWeb.settings.mediaPlaybackRequiresUserGesture=false
+    mainWeb.settings.loadWithOverviewMode=true
+    mainWeb.settings.useWideViewPort=true
+
+    mainWeb.webChromeClient=object:WebChromeClient(){
+      override fun onCreateWindow(view: WebView?, isDialog:Boolean, isUserGesture:Boolean, resultMsg: Message?): Boolean {
+        val transport=resultMsg?.obj as WebView.WebViewTransport
+        transport.webView=ytWeb; resultMsg?.sendToTarget(); ytWeb.visibility=WebView.VISIBLE; return true
+      }
     }
+    mainWeb.webViewClient=object:WebViewClient(){
+      override fun onPageFinished(view: WebView?, url:String?) {
+        if(url?.contains("aviso.bz/tasks-youtube")==true && running) injectAvisoJs()
+      }
+    }
+
+    ytWeb.settings.javaScriptEnabled=true
+    ytWeb.settings.domStorageEnabled=true
+    ytWeb.settings.mediaPlaybackRequiresUserGesture=false
+    ytWeb.webViewClient=object:WebViewClient(){
+      override fun onPageFinished(view:WebView?, url:String?){
+        ytWeb.evaluateJavascript("""
+          (function(){function p(){var v=document.querySelector('video'); if(v){try{v.muted=true; v.play();}catch(e){}}
+          var b=document.querySelector('.ytp-large-play-button')||document.querySelector("button[aria-label*='Play']")||document.querySelector("button[aria-label*='Воспроизвести']"); if(b){b.click();}}
+          setTimeout(p,800);})();
+        """.trimIndent(), null)
+      }
+    }
+
+    btnStart.setOnClickListener{ running=true; mainWeb.loadUrl("https://aviso.bz/tasks-youtube"); Toast.makeText(this,"Старт",Toast.LENGTH_SHORT).show() }
+    btnStop.setOnClickListener { running=false; Toast.makeText(this,"Стоп",Toast.LENGTH_SHORT).show() }
+    mainWeb.loadUrl("https://aviso.bz/tasks-youtube")
+  }
+
+  private fun injectAvisoJs(){
+    val maxTasks=(etMax.text.toString().toIntOrNull()?:30).coerceAtLeast(1)
+    val vmin=etVMin.text.toString().toIntOrNull()?:12
+    val vmax=max(vmin, etVMax.text.toString().toIntOrNull()?:16)
+    val gmin=etGMin.text.toString().toIntOrNull()?:2
+    val gmax=max(gmin, etGMax.text.toString().toIntOrNull()?:4)
+
+    val js="""
+      (function(){
+        if(window.__avisoRun)return; window.__avisoRun=true;
+        const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+        const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+        const TMAX=$maxTasks, GMIN=$gmin, GMAX=$gmax;
+
+        function byText(tag,needle){
+          const list=(tag==="*")?document.querySelectorAll("a,button,div,span"):document.querySelectorAll(tag);
+          const n=(needle||"").toLowerCase();
+          return Array.from(list).find(el=>(el.textContent||"").toLowerCase().includes(n));
+        }
+        function findYT(){
+          const a1=[...document.querySelectorAll("a[href]")].find(a=>/(youtube\\.com|youtu\\.be)/i.test(a.getAttribute("href")||""));
+          if(a1) return a1.href;
+          const idEl=[...document.querySelectorAll("a,div,span")].find(el=>/^[A-Za-z0-9_-]{11}$/.test((el.textContent||"").trim()));
+          if(idEl) return "https://youtu.be/"+(idEl.textContent||"").trim();
+          return null;
+        }
+        async function waitTop(ms=15000){
+          const t0=Date.now();
+          while(Date.now()-t0<ms){
+            if(byText("*","Осталось")||byText("*","Подтвердить просмотр")||byText("*","Отказаться от выполнения")) return true;
+            await sleep(200);
+          } return false;
+        }
+        async function waitConfirm(ms=35000){
+          const t0=Date.now();
+          while(Date.now()-t0<ms){
+            const btn=[...document.querySelectorAll("button,a")].find(b=>/Подтвердить просмотр|Проверить/i.test(b.textContent||""));
+            if(btn && !(btn.disabled||btn.getAttribute("aria-disabled")==="true")) return btn;
+            await sleep(300);
+          } return null;
+        }
+        async function openRow(){
+          let el=[...document.querySelectorAll("a,button,div,span")].find(e=>/(посмотреть видео|просмотр видеоролика|video)/i.test(e.textContent||""));
+          if(!el){ window.scrollBy(0,800); await sleep(500);
+            el=[...document.querySelectorAll("a,button,div,span")].find(e=>/(посмотреть видео|просмотр видеоролика|video)/i.test(e.textContent||"")); }
+          if(!el) return false;
+          (el.closest("a,button")||el).click(); await sleep(1000); return true;
+        }
+        async function loop(){
+          for(let i=0;i<TMAX;i++){
+            if(!(await openRow())){ window.scrollBy(0,800); await sleep(800); continue; }
+            if(!(await waitTop())){ await sleep(800); continue; }
+            const url=findYT(); if(!url){ await sleep(800); continue; }
+            window.open(url,"_blank","noopener"); // перехватит второй WebView
+            const ok=await waitConfirm(); if(ok){ ok.click(); await sleep(700); }
+            const back=byText("a","К списку")||byText("a","Назад")||document.querySelector('a[href*="tasks-youtube"]');
+            if(back){ back.click(); await sleep(1000); }
+            await sleep(rnd(GMIN,GMAX)*1000);
+          }
+        }
+        loop();
+      })();
+    """.trimIndent()
+
+    mainWeb.evaluateJavascript(js, null)
+
+    val watch=max(12, Random.nextInt(vmin, vmax+1))
+    ui.postDelayed({
+      val confirmJs="""
+        (function(){
+          var b=[...document.querySelectorAll('button,a')].find(x=>/Подтвердить просмотр|Проверить/i.test(x.textContent||''));
+          if(b && !(b.disabled||b.getAttribute('aria-disabled')==='true')) b.click();
+        })();
+      """.trimIndent()
+      mainWeb.evaluateJavascript(confirmJs, null)
+    }, (watch*1000).toLong())
+  }
 }
 EOF
 
+      # 2) JDK + Android SDK
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # 3) Ставим Gradle через SDKMAN и генерируем wrapper
+      - name: Install Gradle via SDKMAN
+        run: |
+          curl -s "https://get.sdkman.io" | bash
+          source "$HOME/.sdkman/bin/sdkman-init.sh"
+          sdk install gradle 8.7
+          gradle --version
+          gradle wrapper --gradle-version 8.7
+
+      # 4) Сборка APK
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
+      # 5) Выгрузка артефакта
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: aviso-debug
+          name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
