@@ -1,87 +1,16 @@
-name: Build APK (auto-generate project)
+name: Build APK
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Ensure root gradle files exist
-        run: |
-          if [ ! -f settings.gradle ]; then
-            cat > settings.gradle << 'EOF'
-pluginManagement {
-    repositories { google(); mavenCentral(); gradlePluginPortal() }
-}
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories { google(); mavenCentral() }
-}
-rootProject.name = "AVISO Autoclicker"
-include(":app")
-EOF
-          fi
-
-          if [ ! -f build.gradle ]; then
-            cat > build.gradle << 'EOF'
-buildscript { }
-plugins {
-    id("com.android.application") version "8.5.0" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.24" apply false
-}
-EOF
-          fi
-
-          if [ ! -f gradle.properties ]; then
-            cat > gradle.properties << 'EOF'
-org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
-android.useAndroidX=true
-android.nonTransitiveRClass=true
-EOF
-          fi
-
-      - name: Generate app module (overwrites old)
-        run: |
-          rm -rf app
-          mkdir -p app/src/main/java/top/dvptoken/avisoautoclicker
-          mkdir -p app/src/main/res/layout
-          mkdir -p app/src/main/res/values
-
-          cat > app/build.gradle << 'EOF'
-plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-}
-
-android {
-    namespace = "top.dvptoken.avisoautoclicker"
-    compileSdk = 34
-
-    defaultConfig {
-        applicationId = "top.dvptoken.avisoautoclicker"
-        minSdk = 24
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
-    }
-    buildTypes {
-        release { minifyEnabled = false }
-    }
-}
-
-dependencies {
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.appcompat:appcompat:1.7.0")
-    implementation("com.google.android.material:material:1.12.0")
-}
-EOF
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -89,17 +18,90 @@ EOF
           distribution: temurin
           java-version: 17
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Prepare project
+        run: |
+          mkdir -p app/src/main/java/com/example/app
+          mkdir -p app/src/main/res/layout
+          mkdir -p app/src/main/res/values
+
+          cat > settings.gradle <<'EOF'
+pluginManagement {
+    repositories { google(); mavenCentral(); gradlePluginPortal() }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories { google(); mavenCentral() }
+}
+rootProject.name = "AvisoAutoClicker"
+include(":app")
+EOF
+
+          cat > build.gradle <<'EOF'
+buildscript { }
+plugins {
+    id("com.android.application") version "8.5.0" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+}
+EOF
+
+          cat > gradle.properties <<'EOF'
+org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
+android.useAndroidX=true
+EOF
+
+          cat > app/build.gradle <<'EOF'
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+android {
+    namespace "com.example.app"
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.example.app"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+}
+dependencies {
+    implementation "androidx.core:core-ktx:1.13.1"
+    implementation "androidx.appcompat:appcompat:1.7.0"
+}
+EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.app">
+    <application android:label="AvisoAutoClicker">
+        <activity android:name=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+EOF
+
+          cat > app/src/main/java/com/example/app/MainActivity.kt <<'EOF'
+package com.example.app
+import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
+
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+    }
+}
+EOF
 
       - name: Build Debug APK
-        run: |
-          mkdir -p ~/.android && touch ~/.android/repositories.cfg
-          yes | sdkmanager --licenses
-          ./gradlew assembleDebug || ./gradlew wrapper && ./gradlew assembleDebug
+        run: ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: aviso-debug
           path: app/build/outputs/apk/debug/app-debug.apk
